@@ -339,9 +339,11 @@ const MembershipRequest = () => {
             };
 
             console.log('Membership Request Payload:', payload);
+            console.log('🎯 Using v4/membershipRequestWithPayment endpoint - payment link will be generated automatically');
 
+            // Use V4 endpoint that generates payment link immediately
             const response = await fetch(
-                `${API_BASE_URL}/membership/v3/membershipRequest`,
+                `${API_BASE_URL}/membership/v4/membershipRequestWithPayment`,
                 {
                     method: 'POST',
                     headers: {
@@ -356,11 +358,18 @@ const MembershipRequest = () => {
             const data = await response.json();
             console.log('Membership Request Response:', data);
 
-            if (data.success) {
-                setSuccess('Membership request submitted successfully!');
+            if (data.success && data.payment_link) {
+                console.log('✅ Membership request created and payment link generated');
+                console.log('💳 Payment link:', data.payment_link);
+                console.log('📋 Subscription type:', data.subscription_type);
+                console.log('📅 Duration:', data.duration_months, 'months');
+                
+                setSuccess('Redirecting to payment...');
+                
+                // Redirect to Stripe payment link
                 setTimeout(() => {
-                    navigate('/dashboard');
-                }, 2000);
+                    window.location.href = data.payment_link;
+                }, 1500);
             } else {
                 throw new Error(data.message || 'Request failed');
             }
