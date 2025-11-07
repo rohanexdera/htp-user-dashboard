@@ -7,26 +7,40 @@ import EmailVerification from './components/EmailVerification.jsx';
 import FormFilling from './components/FormFilling.jsx';
 import MembershipRequest from './components/MembershipRequest.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import Header from './components/Header.jsx';
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Login />
+    element: <>
+      <Header />
+      <Login />
+    </>
   },
   {
     path: "/register",
-    element: <RegisterV2 />
+    element:
+    <>
+      <Header />
+      <RegisterV2 />
+    </>
   },
   {
     path: "/verify-email",
-    element: <EmailVerification />
+    element: <>
+      <Header />
+      <EmailVerification />
+    </>
   },
   {
     path: "/form",
     element: (
-      <ProtectedRoute>
-        <MembershipRequest />
-      </ProtectedRoute>
+      <>
+        <Header />
+        <ProtectedRoute>
+          <MembershipRequest />
+        </ProtectedRoute>
+      </>
     )
   },
   {

@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
+import './MembershipRequest.css';
+import goldImg from '../assets/gold.webp';
+import platinumImg from '../assets/platinum.webp';
+import amethystImg from '../assets/ame.webp';
+import solitaireImg from '../assets/Solitaire.webp';
+import silverImg from '../assets/silver.webp';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://party-one-developer.uc.r.appspot.com';
 const UPLOAD_URL = import.meta.env.VITE_MULTIPLEIMAGES_POSTING_URL || API_BASE_URL;
@@ -395,269 +401,238 @@ const MembershipRequest = () => {
     const selectedMembershipData = memberships.find(m => m.id === selectedMembership);
     const isAmethyst = selectedMembershipData?.name === 'Amethyst';
 
+    // Local image map for memberships (fallback to display_image if not found)
+    const imageMap = {
+        Gold: goldImg,
+        Platinum: platinumImg,
+        Amethyst: amethystImg,
+        Solitaire: solitaireImg,
+        Silver: silverImg
+    };
+
     return (
-        <div style={styles.container}>
-            <div style={styles.card}>
-                <h1 style={styles.title}>Upgrade Your Membership</h1>
-                <p style={styles.subtitle}>
-                    Welcome, {userData?.name || currentUser?.email}
-                </p>
+        <div className="mem-page">
+            <div className="mem-container">
+                <header className="mem-header">
+                    <h1 className="mem-title">Upgrade Your Membership</h1>
+                    <p className="mem-subtitle">Welcome, {userData?.name || currentUser?.email}</p>
+                </header>
 
                 {error && (
-                    <div style={styles.errorBox}>
+                    <div className="mem-alert mem-alert-danger" role="alert">
                         <strong>Error:</strong> {error}
                     </div>
                 )}
 
                 {success && (
-                    <div style={styles.successBox}>
-                        {success}
+                    <div className="mem-alert mem-alert-success" role="status">{success}</div>
+                )}
+
+                {userData?.active_membership_name && (
+                    <div className="mem-info">
+                        <strong>Current Membership:</strong> {userData.active_membership_name}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                    {/* Current Membership */}
-                    {userData?.active_membership_name && (
-                        <div style={styles.infoBox}>
-                            <strong>Current Membership:</strong> {userData.active_membership_name}
-                        </div>
-                    )}
+                <section className="mem-grid" aria-label="Membership options">
+                    {memberships.map((m) => {
+                        const selected = selectedMembership === m.id;
+                        const price = m.plans?.[0]?.price ?? 0;
+                        return (
+                            <article
+                                key={m.id}
+                                className={`mem-card ${selected ? 'selected' : ''}`}
+                                onClick={() => { setSelectedMembership(m.id); }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedMembership(m.id); }
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                aria-pressed={selected}
+                                aria-label={`${m.name} membership card${selected ? ' (selected)' : ''}`}
+                            >
+                                <div className="mem-card-media">
+                                                                        <img
+                                                                            src={imageMap[m.name] || m.display_image}
+                                                                            alt={`${m.name} membership visual`}
+                                                                            loading="lazy"
+                                                                        />
+                                </div>
+                                <div className="mem-card-body">
+                                    <div className="mem-card-header">
+                                        <h3 className="mem-name">{m.name}</h3>
+                                        <div className="mem-price">${price}</div>
+                                    </div>
+                                    {m.tagline?.taglines?.[0] && (
+                                        <p className="mem-tagline">{m.tagline.taglines[0]}</p>
+                                    )}
+                                    <ul className="mem-benefits">
+                                        {(m.benifits || m.benefits || []).slice(0,3).map((b, idx) => (
+                                            <li key={idx}>{b.title || b.description}</li>
+                                        ))}
+                                    </ul>
 
-                    {/* Available Memberships */}
-                    <div style={styles.formGroup}>
-                        <label style={styles.label}>Choose Membership</label>
-                        <div style={styles.radioGroup}>
-                            {memberships.map((membership) => (
-                                <label key={membership.id} style={styles.radioLabel}>
-                                    <input
-                                        type="radio"
-                                        name="membership"
-                                        value={membership.id}
-                                        checked={selectedMembership === membership.id}
-                                        onChange={(e) => {
-                                            setSelectedMembership(e.target.value);
-                                            setSelectedPlan('');
-                                        }}
-                                        style={styles.radio}
-                                    />
-                                    <span style={styles.radioText}>
-                                        {membership.name} - ${membership.plans[0]?.price}
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
+                                    {/* Inline plan chooser for Amethyst when selected */}
+                                    {selected && m.name === 'Amethyst' && (
+                                        <div className="mem-plans">
+                                            {m.plans.map((plan) => (
+                                                <label
+                                                    key={plan.plan_unique_id}
+                                                    className={`plan-chip ${selectedPlan === plan.plan_unique_id ? 'active' : ''}`}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="amethyst-plan"
+                                                        value={plan.plan_unique_id}
+                                                        checked={selectedPlan === plan.plan_unique_id}
+                                                        onChange={(e) => setSelectedPlan(e.target.value)}
+                                                    />
+                                                    <span>{plan.duration} mo</span>
+                                                    <strong>${plan.price}</strong>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
 
-                    {/* Amethyst Plan Selection */}
-                    {isAmethyst && (
-                        <div style={styles.formGroup}>
-                            <label style={styles.label}>Select Amethyst Plan</label>
-                            <div style={styles.radioGroup}>
-                                {selectedMembershipData.plans.map((plan) => (
-                                    <label key={plan.plan_unique_id} style={styles.radioLabel}>
-                                        <input
-                                            type="radio"
-                                            name="plan"
-                                            value={plan.plan_unique_id}
-                                            checked={selectedPlan === plan.plan_unique_id}
-                                            onChange={(e) => setSelectedPlan(e.target.value)}
-                                            style={styles.radio}
-                                            required
-                                        />
-                                        <span style={styles.radioText}>
-                                            {plan.plan_name} - ${plan.price}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                                    <div className="mem-actions">
+                                        <button
+                                            type="button"
+                                            className="primary-btn"
+                                            onClick={(e) => { e.stopPropagation(); setSelectedMembership(m.id); setSelectedPlan(''); }}
+                                            aria-pressed={selected}
+                                        >
+                                            {selected ? 'Selected' : 'Select'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        );
+                    })}
+                </section>
 
-                    {/* Amethyst Cabin Crew Documents */}
-                    {isAmethyst && (
-                        <>
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Cabin Crew Front ID *</label>
+                {/* Extra requirements for Amethyst */}
+                {isAmethyst && (
+                    <section className="mem-extra">
+                        <h2 className="section-title">Cabin Crew Verification</h2>
+                        <div className="dual-row">
+                            <div className="form-field">
+                                <label className="field-label">Cabin Crew Front ID *</label>
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => handleFileChange(e, 'cabinCrewFront')}
-                                    style={styles.fileInput}
+                                    className="file-input"
                                     required
                                 />
-                                <p style={styles.hint}>Allowed formats: JPEG, PNG, GIF</p>
+                                <p className="field-hint">Allowed formats: JPEG, PNG, GIF</p>
                             </div>
-
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Cabin Crew Back ID *</label>
+                            <div className="form-field">
+                                <label className="field-label">Cabin Crew Back ID *</label>
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => handleFileChange(e, 'cabinCrewBack')}
-                                    style={styles.fileInput}
+                                    className="file-input"
                                     required
                                 />
-                                <p style={styles.hint}>Allowed formats: JPEG, PNG, GIF</p>
+                                <p className="field-hint">Allowed formats: JPEG, PNG, GIF</p>
                             </div>
-                        </>
-                    )}
+                        </div>
+                    </section>
+                )}
 
-                    {/* Submit Button */}
+                <form onSubmit={handleSubmit} className="mem-submit">
                     <button
                         type="submit"
-                        disabled={loading || !selectedMembership}
-                        style={{
-                            ...styles.submitButton,
-                            ...(loading || !selectedMembership ? styles.buttonDisabled : {})
-                        }}
+                        className="primary-btn"
+                        disabled={loading || !selectedMembership || (isAmethyst && !selectedPlan)}
                     >
-                        {loading ? 'Processing...' : 'Submit Request'}
+                        {loading ? 'Processing…' : 'Submit Request'}
+                    </button>
+                    <button type="button" className="outline-btn back-btn" onClick={() => navigate('/form')}>
+                        ← Back to Dashboard
                     </button>
                 </form>
-
-                {/* Back to Dashboard */}
-                <button
-                    onClick={() => navigate('/form')}
-                    style={styles.backButton}
-                >
-                    ← Back to Dashboard
-                </button>
             </div>
 
             {/* KYC Modal */}
             {showKycModal && (
-                <div style={styles.modalOverlay}>
-                    <div style={styles.modal}>
-                        <h2 style={styles.modalTitle}>Complete KYC Verification</h2>
-                        <p style={styles.modalSubtitle}>
-                            KYC verification is required before applying for membership
-                        </p>
+                <div className="mem-modal-overlay">
+                    <div className="mem-modal">
+                        <h2 className="mem-modal-title">Complete KYC Verification</h2>
+                        <p className="mem-modal-subtitle">KYC verification is required before applying for membership</p>
 
-                        <form onSubmit={submitKyc}>
-                            {/* Government ID Front */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Government ID (Front) *</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleFileChange(e, 'frontId')}
-                                    style={styles.fileInput}
-                                    required
-                                />
-                                {previewImages.frontId && (
-                                    <img src={previewImages.frontId} alt="Front ID" style={styles.preview} />
-                                )}
+                        <form onSubmit={submitKyc} className="kyc-form">
+                            <div className="form-field">
+                                <label className="field-label">Government ID (Front) *</label>
+                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'frontId')} className="file-input" required />
+                                {previewImages.frontId && (<img src={previewImages.frontId} alt="Front ID" className="preview" />)}
                             </div>
 
-                            {/* Government ID Back */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Government ID (Back) *</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleFileChange(e, 'backId')}
-                                    style={styles.fileInput}
-                                    required
-                                />
-                                {previewImages.backId && (
-                                    <img src={previewImages.backId} alt="Back ID" style={styles.preview} />
-                                )}
+                            <div className="form-field">
+                                <label className="field-label">Government ID (Back) *</label>
+                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'backId')} className="file-input" required />
+                                {previewImages.backId && (<img src={previewImages.backId} alt="Back ID" className="preview" />)}
                             </div>
 
-                            {/* User Photo */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Your Photo *</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleFileChange(e, 'userPhoto')}
-                                    style={styles.fileInput}
-                                    required
-                                />
-                                {previewImages.userPhoto && (
-                                    <img src={previewImages.userPhoto} alt="User Photo" style={styles.preview} />
-                                )}
+                            <div className="form-field">
+                                <label className="field-label">Your Photo *</label>
+                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'userPhoto')} className="file-input" required />
+                                {previewImages.userPhoto && (<img src={previewImages.userPhoto} alt="User Photo" className="preview" />)}
                             </div>
 
-                            {/* Name */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Full Name *</label>
-                                <input
-                                    type="text"
-                                    value={kycForm.name}
-                                    onChange={(e) => setKycForm({ ...kycForm, name: e.target.value })}
-                                    style={styles.input}
-                                    placeholder="Enter your full name"
-                                    required
-                                />
+                            <div className="form-field">
+                                <label className="field-label">Full Name *</label>
+                                <input type="text" value={kycForm.name} onChange={(e) => setKycForm({ ...kycForm, name: e.target.value })} className="text-input" placeholder="Enter your full name" required />
                             </div>
 
-                            {/* Government ID Number */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Government ID Number *</label>
-                                <input
-                                    type="text"
-                                    value={kycForm.governmentNumber}
-                                    onChange={(e) => setKycForm({ ...kycForm, governmentNumber: e.target.value })}
-                                    style={styles.input}
-                                    placeholder="Enter government ID number"
-                                    required
-                                />
+                            <div className="form-field">
+                                <label className="field-label">Government ID Number *</label>
+                                <input type="text" value={kycForm.governmentNumber} onChange={(e) => setKycForm({ ...kycForm, governmentNumber: e.target.value })} className="text-input" placeholder="Enter government ID number" required />
                             </div>
 
-                            {/* Nationality */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Nationality *</label>
-                                <input
-                                    type="text"
-                                    value={kycForm.nationality}
-                                    onChange={(e) => setKycForm({ ...kycForm, nationality: e.target.value })}
-                                    style={styles.input}
-                                    placeholder="Enter nationality"
-                                    required
-                                />
+                            <div className="form-field">
+                                <label className="field-label">Nationality *</label>
+                                <input type="text" value={kycForm.nationality} onChange={(e) => setKycForm({ ...kycForm, nationality: e.target.value })} className="text-input" placeholder="Enter nationality" required />
                             </div>
 
-                            {/* Country */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Country *</label>
+                            <div className="form-field">
+                                <label className="field-label">Country *</label>
                                 <select
                                     value={kycForm.country}
                                     onChange={(e) => {
                                         const selectedCountry = kycLocations.countries.find(c => c.id === parseInt(e.target.value));
-                                        setKycForm({ 
-                                            ...kycForm, 
-                                            country: e.target.value, 
+                                        setKycForm({
+                                            ...kycForm,
+                                            country: e.target.value,
                                             countryName: selectedCountry?.name || '',
-                                            state: '', 
+                                            state: '',
                                             stateName: '',
                                             city: '',
                                             cityName: ''
                                         });
                                         fetchStates(e.target.value);
                                     }}
-                                    style={styles.input}
+                                    className="select-input"
                                     required
                                 >
                                     <option value="">Select Country</option>
                                     {kycLocations.countries.map((country) => (
-                                        <option key={country.id} value={country.id}>
-                                            {country.name}
-                                        </option>
+                                        <option key={country.id} value={country.id}>{country.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* State */}
                             {kycForm.country && (
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>State *</label>
+                                <div className="form-field">
+                                    <label className="field-label">State *</label>
                                     <select
                                         value={kycForm.state}
                                         onChange={(e) => {
                                             const selectedState = kycLocations.states.find(s => s.id === parseInt(e.target.value));
-                                            setKycForm({ 
-                                                ...kycForm, 
+                                            setKycForm({
+                                                ...kycForm,
                                                 state: e.target.value,
                                                 stateName: selectedState?.name || '',
                                                 city: '',
@@ -665,107 +640,63 @@ const MembershipRequest = () => {
                                             });
                                             fetchCities(kycForm.country, e.target.value);
                                         }}
-                                        style={styles.input}
+                                        className="select-input"
                                         required
                                     >
                                         <option value="">Select State</option>
                                         {kycLocations.states.map((state) => (
-                                            <option key={state.id} value={state.id}>
-                                                {state.name}
-                                            </option>
+                                            <option key={state.id} value={state.id}>{state.name}</option>
                                         ))}
                                     </select>
                                 </div>
                             )}
 
-                            {/* City */}
                             {kycForm.state && (
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>City *</label>
+                                <div className="form-field">
+                                    <label className="field-label">City *</label>
                                     <select
                                         value={kycForm.city}
                                         onChange={(e) => {
                                             const selectedCity = kycLocations.cities.find(c => c.id === parseInt(e.target.value));
-                                            setKycForm({ 
-                                                ...kycForm, 
+                                            setKycForm({
+                                                ...kycForm,
                                                 city: e.target.value,
                                                 cityName: selectedCity?.name || ''
                                             });
                                         }}
-                                        style={styles.input}
+                                        className="select-input"
                                         required
                                     >
                                         <option value="">Select City</option>
                                         {kycLocations.cities.map((city) => (
-                                            <option key={city.id} value={city.id}>
-                                                {city.name}
-                                            </option>
+                                            <option key={city.id} value={city.id}>{city.name}</option>
                                         ))}
                                     </select>
                                 </div>
                             )}
 
-                            {/* Mailing Address */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Mailing Address *</label>
-                                <input
-                                    type="text"
-                                    value={kycForm.mailingAddress}
-                                    onChange={(e) => setKycForm({ ...kycForm, mailingAddress: e.target.value })}
-                                    style={styles.input}
-                                    placeholder="Enter mailing address"
-                                    required
-                                />
+                            <div className="form-field">
+                                <label className="field-label">Mailing Address *</label>
+                                <input type="text" value={kycForm.mailingAddress} onChange={(e) => setKycForm({ ...kycForm, mailingAddress: e.target.value })} className="text-input" placeholder="Enter mailing address" required />
                             </div>
 
-                            {/* Pincode */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Pincode *</label>
-                                <input
-                                    type="text"
-                                    value={kycForm.pincode}
-                                    onChange={(e) => setKycForm({ ...kycForm, pincode: e.target.value })}
-                                    style={styles.input}
-                                    placeholder="Enter pincode"
-                                    required
-                                />
+                            <div className="form-field">
+                                <label className="field-label">Pincode *</label>
+                                <input type="text" value={kycForm.pincode} onChange={(e) => setKycForm({ ...kycForm, pincode: e.target.value })} className="text-input" placeholder="Enter pincode" required />
                             </div>
 
-                            {/* Frequency of Clubbing */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>How often do you visit clubs? *</label>
-                                <select
-                                    value={kycForm.frequencyOfClubbing}
-                                    onChange={(e) => setKycForm({ ...kycForm, frequencyOfClubbing: e.target.value })}
-                                    style={styles.input}
-                                    required
-                                >
+                            <div className="form-field">
+                                <label className="field-label">How often do you visit clubs? *</label>
+                                <select value={kycForm.frequencyOfClubbing} onChange={(e) => setKycForm({ ...kycForm, frequencyOfClubbing: e.target.value })} className="select-input" required>
                                     <option value="Mostly daily">Regularly</option>
                                     <option value="Weekly">Weekends Only</option>
                                     <option value="Occasionally">Occasionally</option>
                                 </select>
                             </div>
 
-                            {/* Modal Buttons */}
-                            <div style={styles.modalButtons}>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowKycModal(false)}
-                                    style={styles.cancelButton}
-                                    disabled={loading}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    style={{
-                                        ...styles.submitButton,
-                                        ...(loading ? styles.buttonDisabled : {})
-                                    }}
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Submitting...' : 'Submit KYC & Continue'}
-                                </button>
+                            <div className="modal-actions">
+                                <button type="button" className="outline-btn" onClick={() => setShowKycModal(false)} disabled={loading}>Cancel</button>
+                                <button type="submit" className="primary-btn" disabled={loading}>{loading ? 'Submitting…' : 'Submit KYC & Continue'}</button>
                             </div>
                         </form>
                     </div>
