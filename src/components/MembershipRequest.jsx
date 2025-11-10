@@ -414,7 +414,6 @@ const MembershipRequest = () => {
         <div className="mem-page">
             <div className="mem-container">
                 <header className="mem-header">
-                    <h1 className="mem-title">Upgrade Your Membership</h1>
                     <p className="mem-subtitle">Welcome, {userData?.name || currentUser?.email}</p>
                 </header>
 
