@@ -29,6 +29,8 @@ const MembershipRequest = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmingMembership, setConfirmingMembership] = useState(null);
     const [kycLocations, setKycLocations] = useState({
         countries: [],
         states: [],
@@ -387,15 +389,22 @@ const MembershipRequest = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleCardClick = (membership) => {
+        setConfirmingMembership(membership);
+        setSelectedMembership(membership.id);
+        setSelectedPlan(''); // Reset plan selection
+        setShowConfirmModal(true);
+    };
 
+    const handleConfirmSubmit = async () => {
         if (!kycDetails) {
+            setShowConfirmModal(false);
             setShowKycModal(true);
             return;
         }
 
         await submitMembershipRequest();
+        setShowConfirmModal(false);
     };
 
     const selectedMembershipData = memberships.find(m => m.id === selectedMembership);
@@ -441,14 +450,14 @@ const MembershipRequest = () => {
                             <article
                                 key={m.id}
                                 className={`mem-card ${selected ? 'selected' : ''}`}
-                                onClick={() => { setSelectedMembership(m.id); }}
+                                onClick={() => handleCardClick(m)}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedMembership(m.id); }
+                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(m); }
                                 }}
                                 role="button"
                                 tabIndex={0}
                                 aria-pressed={selected}
-                                aria-label={`${m.name} membership card${selected ? ' (selected)' : ''}`}
+                                aria-label={`${m.name} membership - Click to request`}
                             >
                                 <div className="mem-card-media">
                                                                         <img
@@ -471,37 +480,13 @@ const MembershipRequest = () => {
                                         ))}
                                     </ul>
 
-                                    {/* Inline plan chooser for Amethyst when selected */}
-                                    {selected && m.name === 'Amethyst' && (
-                                        <div className="mem-plans">
-                                            {m.plans.map((plan) => (
-                                                <label
-                                                    key={plan.plan_unique_id}
-                                                    className={`plan-chip ${selectedPlan === plan.plan_unique_id ? 'active' : ''}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <input
-                                                        type="radio"
-                                                        name="amethyst-plan"
-                                                        value={plan.plan_unique_id}
-                                                        checked={selectedPlan === plan.plan_unique_id}
-                                                        onChange={(e) => setSelectedPlan(e.target.value)}
-                                                    />
-                                                    <span>{plan.duration} mo</span>
-                                                    <strong>${plan.price}</strong>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
-
                                     <div className="mem-actions">
                                         <button
                                             type="button"
                                             className="primary-btn"
-                                            onClick={(e) => { e.stopPropagation(); setSelectedMembership(m.id); setSelectedPlan(''); }}
-                                            aria-pressed={selected}
+                                            onClick={(e) => { e.stopPropagation(); handleCardClick(m); }}
                                         >
-                                            {selected ? 'Selected' : 'Select'}
+                                            Request Now
                                         </button>
                                     </div>
                                 </div>
@@ -510,50 +495,107 @@ const MembershipRequest = () => {
                     })}
                 </section>
 
-                {/* Extra requirements for Amethyst */}
-                {isAmethyst && (
-                    <section className="mem-extra">
-                        <h2 className="section-title">Cabin Crew Verification</h2>
-                        <div className="dual-row">
-                            <div className="form-field">
-                                <label className="field-label">Cabin Crew Front ID *</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleFileChange(e, 'cabinCrewFront')}
-                                    className="file-input"
-                                    required
-                                />
-                                <p className="field-hint">Allowed formats: JPEG, PNG, GIF</p>
-                            </div>
-                            <div className="form-field">
-                                <label className="field-label">Cabin Crew Back ID *</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleFileChange(e, 'cabinCrewBack')}
-                                    className="file-input"
-                                    required
-                                />
-                                <p className="field-hint">Allowed formats: JPEG, PNG, GIF</p>
+            </div>
+
+            {/* Confirmation Modal */}
+            {showConfirmModal && confirmingMembership && (
+                <div className="mem-modal-overlay">
+                    <div className="mem-modal">
+                        <h2 className="mem-modal-title">Confirm Membership Request</h2>
+                        <p className="mem-modal-subtitle">
+                            You are requesting <strong>{confirmingMembership.name}</strong> membership
+                        </p>
+
+                        <div className="confirm-details">
+                            {confirmingMembership.tagline?.taglines?.[0] && (
+                                <p className="confirm-tagline">{confirmingMembership.tagline.taglines[0]}</p>
+                            )}
+                            
+                            {confirmingMembership.name === 'Amethyst' && (
+                                <div className="confirm-plans">
+                                    <label className="field-label">Select Plan *</label>
+                                    <div className="mem-plans">
+                                        {confirmingMembership.plans.map((plan) => (
+                                            <label
+                                                key={plan.plan_unique_id}
+                                                className={`plan-chip ${selectedPlan === plan.plan_unique_id ? 'active' : ''}`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="amethyst-plan-confirm"
+                                                    value={plan.plan_unique_id}
+                                                    checked={selectedPlan === plan.plan_unique_id}
+                                                    onChange={(e) => setSelectedPlan(e.target.value)}
+                                                />
+                                                <span>{plan.duration} mo</span>
+                                                <strong>${plan.price}</strong>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {confirmingMembership.name === 'Amethyst' && (
+                                <div className="confirm-cabin-crew">
+                                    <h3 className="section-title">Cabin Crew Verification</h3>
+                                    <div className="dual-row">
+                                        <div className="form-field">
+                                            <label className="field-label">Cabin Crew Front ID *</label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleFileChange(e, 'cabinCrewFront')}
+                                                className="file-input"
+                                                required
+                                            />
+                                            <p className="field-hint">JPEG, PNG, GIF</p>
+                                        </div>
+                                        <div className="form-field">
+                                            <label className="field-label">Cabin Crew Back ID *</label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleFileChange(e, 'cabinCrewBack')}
+                                                className="file-input"
+                                                required
+                                            />
+                                            <p className="field-hint">JPEG, PNG, GIF</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="confirm-price">
+                                <span className="price-label">Total Amount:</span>
+                                <span className="price-value">
+                                    ${confirmingMembership.name === 'Amethyst' && selectedPlan
+                                        ? confirmingMembership.plans.find(p => p.plan_unique_id === selectedPlan)?.price
+                                        : confirmingMembership.plans?.[0]?.price ?? 0}
+                                </span>
                             </div>
                         </div>
-                    </section>
-                )}
 
-                <form onSubmit={handleSubmit} className="mem-submit">
-                    <button
-                        type="submit"
-                        className="primary-btn"
-                        disabled={loading || !selectedMembership || (isAmethyst && !selectedPlan)}
-                    >
-                        {loading ? 'Processing…' : 'Submit Request'}
-                    </button>
-                    <button type="button" className="outline-btn back-btn" onClick={() => navigate('/form')}>
-                        ← Back to Dashboard
-                    </button>
-                </form>
-            </div>
+                        <div className="modal-actions">
+                            <button 
+                                type="button" 
+                                className="outline-btn" 
+                                onClick={() => { setShowConfirmModal(false); setConfirmingMembership(null); }}
+                                disabled={loading}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                className="primary-btn" 
+                                onClick={handleConfirmSubmit}
+                                disabled={loading || (confirmingMembership.name === 'Amethyst' && !selectedPlan)}
+                            >
+                                {loading ? 'Processing…' : 'Confirm & Submit'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* KYC Modal */}
             {showKycModal && (
