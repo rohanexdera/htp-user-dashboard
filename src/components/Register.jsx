@@ -73,8 +73,8 @@ const Register = () => {
       if (result.success) {
         // Save user data to context
         saveUserData(result.user);
-        // Navigate to form page
-        navigate('/form');
+        // Email/password users already provided all info - go to membership
+        navigate('/membership-request');
       } else {
         // Handle Firebase error codes
         const errorMessage = getErrorMessage(result.error);
@@ -97,7 +97,13 @@ const Register = () => {
       
       if (result.success) {
         saveUserData(result.user);
-        navigate('/form');
+        
+        // Google OAuth users need to complete profile if incomplete
+        if (result.needsAdditionalInfo || !result.user.profileComplete) {
+          navigate('/form');
+        } else {
+          navigate('/membership-request');
+        }
       } else {
         const errorMessage = getErrorMessage(result.error);
         setError(errorMessage);

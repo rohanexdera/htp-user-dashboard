@@ -38,17 +38,20 @@ const router = createBrowserRouter([
       <>
         <Header />
         <ProtectedRoute>
-          <MembershipRequest />
+          <FormFilling />
         </ProtectedRoute>
       </>
     )
   },
   {
-    path: "/dashboard",
+    path: "/membership-request",
     element: (
-      <ProtectedRoute>
-        <FormFilling />
-      </ProtectedRoute>
+      <>
+        <Header />
+        <ProtectedRoute>
+          <MembershipRequest />
+        </ProtectedRoute>
+      </>
     )
   }
 ]);

@@ -23,8 +23,8 @@ const Login = () => {
       if (result.success) {
         // Save user data to context
         saveUserData(result.user);
-        // Navigate to form page
-        navigate('/form');
+        // Email/password users already have complete profiles
+        navigate('/membership-request');
       } else {
         // Handle Firebase error codes
         const errorMessage = getErrorMessage(result.error);

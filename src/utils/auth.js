@@ -195,10 +195,57 @@ export const loginWithGoogle = async () => {
         const userDocSnap = await getDoc(userDocRef);
         
         if (userDocSnap.exists()) {
-            // Existing user - return with profile data
+            // Existing user - check if profile is complete
             console.log('✅ Returning user - profile found');
             const userData = userDocSnap.data();
             
+            console.log('📊 Current user data from Firestore:', {
+                gender: userData.gender,
+                dob: userData.dob,
+                contacts: userData.contacts,
+                home_country: userData.home_country,
+                home_state: userData.home_state,
+                home_city: userData.home_city
+            });
+            
+            // Check if essential profile fields are filled
+            const isProfileComplete = !!(
+                userData.gender && 
+                userData.dob && 
+                userData.contacts && 
+                userData.contacts.length > 0 &&
+                userData.home_country &&
+                userData.home_state &&
+                userData.home_city
+            );
+            
+            console.log('✓ Profile completeness check:', {
+                gender: !!userData.gender,
+                dob: !!userData.dob,
+                contacts: !!(userData.contacts && userData.contacts.length > 0),
+                location: !!(userData.home_country && userData.home_state && userData.home_city),
+                OVERALL: isProfileComplete ? '✅ COMPLETE' : '❌ INCOMPLETE'
+            });
+            
+            if (!isProfileComplete) {
+                console.log('🔀 Profile incomplete - redirecting to FORM');
+                return {
+                    success: true,
+                    isNewUser: false,
+                    needsAdditionalInfo: true,
+                    user: {
+                        uid: user.uid,
+                        email: user.email,
+                        name: user.displayName || userData.name,
+                        photoURL: user.photoURL,
+                        idToken,
+                        token: idToken,
+                        profileComplete: false
+                    }
+                };
+            }
+            
+            console.log('🔀 Profile complete - redirecting to MEMBERSHIP');
             return {
                 success: true,
                 isNewUser: false,
