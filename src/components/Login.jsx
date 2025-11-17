@@ -26,8 +26,8 @@ const Login = () => {
         // Email/password users already have complete profiles
         navigate('/membership-request');
       } else {
-        // Handle Firebase error codes
-        const errorMessage = getErrorMessage(result.error);
+        // Handle error - use custom message if provided, otherwise lookup error code
+        const errorMessage = result.message || getErrorMessage(result.error);
         setError(errorMessage);
       }
     } catch (err) {
@@ -77,6 +77,7 @@ const Login = () => {
       'auth/invalid-credential': 'Invalid email or password.',
       'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
       'auth/network-request-failed': 'Network error. Please check your connection.',
+      'email-not-verified': 'Please verify your email before logging in. Check your inbox for the verification link.',
     };
     return errorMessages[errorCode] || 'Login failed. Please try again.';
   };

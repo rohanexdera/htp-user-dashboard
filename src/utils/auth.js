@@ -17,101 +17,62 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://party-one-develope
 
 /**
  * Register user with email and password
- * Uses Firebase/Firestore backend endpoint (not MySQL)
+ * Creates Firebase Auth user and sends verification email
+ * Firestore doc will be created on first login after verification
  */
 export const registerWithEmailAndPassword = async (userData) => {
     try {
         const { email, password, name, gender, dob, contactNo, isWhatsapp, home_country, home_country_name, home_state, home_state_name, home_city, home_city_name } = userData;
 
-        // Prepare contacts array as per backend schema
-        // Backend requires at least one contact with mode='phone' for phone_no field
-        const contacts = [];
+        console.log('📝 Starting email/password registration for:', email);
 
-        if (contactNo && contactNo.trim()) {
-            // If user provided a contact number
-            if (isWhatsapp) {
-                // Add both phone and whatsapp entries
-                contacts.push({
-                    contact_no: contactNo,
-                    mode: 'phone',
-                    is_active: true,
-                    is_verified: false
-                });
-                contacts.push({
-                    contact_no: contactNo,
-                    mode: 'whatsapp',
-                    is_active: true,
-                    is_verified: false
-                });
-            } else {
-                // Add only phone entry
-                contacts.push({
-                    contact_no: contactNo,
-                    mode: 'phone',
-                    is_active: true,
-                    is_verified: false
-                });
-            }
-        } else {
-            // No contact number provided - add empty phone contact as required by backend
-            contacts.push({
-                contact_no: "",
-                mode: 'phone',
-                is_active: false,
-                is_verified: false
-            });
-        }
+        // Step 1: Create Firebase Auth user (not verified yet)
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
 
-        // Prepare request body for /user/v2/create (Firestore endpoint)
-        const requestBody = {
+        console.log('✅ Firebase Auth user created:', user.uid);
+
+        // Step 2: Send email verification
+        await sendEmailVerification(user, {
+            url: window.location.origin + '/', // Redirect to login after verification
+            handleCodeInApp: false
+        });
+
+        console.log('📧 Verification email sent to:', email);
+
+        // Step 3: Store registration data temporarily in Firestore (pending collection)
+        // This will be used to complete profile after email verification
+        const pendingUserData = {
+            uid: user.uid,
             email,
-            password,
             name,
             gender: gender || null,
             dob: dob || null,
-            contacts: contacts,
-            role: ['user'], // Default role
-            profile_image: null,
-            home_city: home_city || null,
-            home_city_name: home_city_name || null,
-            home_state: home_state || null,
-            home_state_name: home_state_name || null,
+            contactNo: contactNo || null,
+            isWhatsapp: isWhatsapp || false,
             home_country: home_country || null,
             home_country_name: home_country_name || null,
-            smoking_habbit: false,
-            drinking_habbit: false
+            home_state: home_state || null,
+            home_state_name: home_state_name || null,
+            home_city: home_city || null,
+            home_city_name: home_city_name || null,
+            createdAt: serverTimestamp(),
+            emailVerified: false,
+            registrationComplete: false
         };
 
-        // Call backend to create user (backend will create Firebase user and Firestore doc)
-        const response = await fetch(`${API_BASE_URL}/user/v2/create`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
+        await setDoc(doc(db, 'pending_users', user.uid), pendingUserData);
 
-        const data = await response.json();
+        console.log('💾 Pending user data stored');
 
-        if (!data.success) {
-            throw new Error(data.message || 'Registration failed');
-        }
-
-        // Now sign in the user to get the token
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        const idToken = await user.getIdToken();
+        // Step 4: Sign out user (they need to verify email first)
+        await signOut(auth);
 
         return {
             success: true,
-            user: {
-                uid: user.uid,
-                email: user.email,
-                name: name,
-                idToken: idToken,
-                token: idToken,
-                home_city_name: home_city_name
-            }
+            needsVerification: true,
+            email: email,
+            message: 'Registration successful! Please check your email to verify your account.'
         };
     } catch (error) {
         console.error("Error in registration:", error);
@@ -124,42 +85,128 @@ export const registerWithEmailAndPassword = async (userData) => {
 
 /**
  * Login user with email and password
- * Follows backend pattern: Firebase auth client-side, then call backend API
+ * Checks email verification and creates Firestore doc on first verified login
  */
 export const loginWithEmailAndPassword = async (email, password) => {
     try {
+        console.log('🔐 Starting login for:', email);
+
         // Step 1: Sign in with Firebase
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Step 2: Get ID token
+        console.log('✅ Firebase sign-in successful');
+
+        // Step 2: Check if email is verified
+        if (!user.emailVerified) {
+            // Sign out unverified user
+            await signOut(auth);
+            console.log('❌ Email not verified');
+            return {
+                success: false,
+                error: 'email-not-verified',
+                message: 'Please verify your email before logging in. Check your inbox for the verification link.'
+            };
+        }
+
+        console.log('✅ Email verified');
+
+        // Step 3: Check if user profile exists in Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (!userDocSnap.exists()) {
+            // First verified login - create Firestore user doc from pending data
+            console.log('🆕 First verified login - creating user profile');
+
+            // Get pending user data
+            const pendingUserRef = doc(db, 'pending_users', user.uid);
+            const pendingUserSnap = await getDoc(pendingUserRef);
+
+            if (pendingUserSnap.exists()) {
+                const pendingData = pendingUserSnap.data();
+
+                // Prepare contacts array
+                const contacts = [];
+                if (pendingData.contactNo && pendingData.contactNo.trim()) {
+                    if (pendingData.isWhatsapp) {
+                        contacts.push({
+                            contact_no: pendingData.contactNo,
+                            mode: 'phone',
+                            is_active: true,
+                            is_verified: false
+                        });
+                        contacts.push({
+                            contact_no: pendingData.contactNo,
+                            mode: 'whatsapp',
+                            is_active: true,
+                            is_verified: false
+                        });
+                    } else {
+                        contacts.push({
+                            contact_no: pendingData.contactNo,
+                            mode: 'phone',
+                            is_active: true,
+                            is_verified: false
+                        });
+                    }
+                } else {
+                    contacts.push({
+                        contact_no: "",
+                        mode: 'phone',
+                        is_active: false,
+                        is_verified: false
+                    });
+                }
+
+                // Create user doc in Firestore
+                await setDoc(userDocRef, {
+                    id: user.uid,
+                    email: user.email,
+                    name: pendingData.name,
+                    gender: pendingData.gender,
+                    dob: pendingData.dob,
+                    contacts: contacts,
+                    phone_no: pendingData.contactNo || "",
+                    home_country: pendingData.home_country,
+                    home_country_name: pendingData.home_country_name,
+                    home_state: pendingData.home_state,
+                    home_state_name: pendingData.home_state_name,
+                    home_city: pendingData.home_city,
+                    home_city_name: pendingData.home_city_name,
+                    role: ['user'],
+                    profile_image: null,
+                    active_membership_id: null,
+                    active_membership_name: null,
+                    last_membership_id: null,
+                    last_membership_name: null,
+                    smoking_habbit: false,
+                    drinking_habbit: false,
+                    status: 'Active',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+
+                console.log('✅ User profile created in Firestore');
+
+                // Delete pending user data
+                await setDoc(pendingUserRef, { registrationComplete: true, completedAt: serverTimestamp() }, { merge: true });
+            }
+        }
+
+        // Step 4: Get ID token
         const idToken = await user.getIdToken();
 
-        // Step 3: Call backend login API to update token and get user data
-        const response = await fetch(`${API_BASE_URL}/login/v1/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                email,
-                password
-            })
-        });
-
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.message || 'Login failed');
-        }
+        console.log('✅ Login successful');
 
         return {
             success: true,
             user: {
-                uid: data.uid || user.uid,
-                email: data.email || user.email,
-                idToken: data.token || idToken,
-                token: data.token || idToken
+                uid: user.uid,
+                email: user.email,
+                idToken: idToken,
+                token: idToken,
+                emailVerified: true
             }
         };
     } catch (error) {

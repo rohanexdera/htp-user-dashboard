@@ -200,10 +200,14 @@ const Register = () => {
 
       const result = await registerWithEmailAndPassword(userData);
       
-      if (result.success) {
-        // Registration successful - user created in both Firebase Auth and Firestore
+      if (result.success && result.needsVerification) {
+        // Registration successful - show verification message
+        alert(`✅ Registration successful!\n\nA verification email has been sent to ${result.email}.\n\nPlease check your inbox and click the verification link before logging in.`);
+        // Redirect to login page
+        navigate('/');
+      } else if (result.success) {
+        // Shouldn't happen with new flow, but handle just in case
         saveUserData(result.user);
-        // Email/password users already provided all info - go to membership
         navigate('/membership-request');
       } else {
         // Handle Firebase error codes
