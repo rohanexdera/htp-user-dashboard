@@ -1,0 +1,44 @@
+# This file specifies files that are *not* uploaded to Google Cloud Platform
+# NOTE: We explicitly manage what to ignore instead of including .gitignore
+# because .gitignore excludes dist/ which we need for deployment
+
+.gcloudignore
+.git
+.gitignore
+
+# Node.js dependencies
+node_modules/
+
+# Source files (we only need dist/ for deployment)
+src/
+public/
+
+# Config and test files
+*.md
+*.mjs
+*.config.js
+test-*.js
+test-*.mjs
+firebase.js
+.env
+.env.example
+eslint.config.js
+package.json
+package-lock.json
+vite.config.js
+
+# Root index.html (we use dist/index.html)
+/index.html
+
+# Logs
+logs/
+*.log
+
+# Editor and OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.local

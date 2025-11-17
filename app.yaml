@@ -1,0 +1,18 @@
+runtime: nodejs20
+service: party-one-frontend
+
+handlers:
+  # Serve all static files with url ending with a file extension
+  - url: /(.*\..+)$
+    static_files: dist/\1
+    upload: dist/(.*\..+)$
+    secure: always
+  
+  # Catch all handler to index.html for React Router
+  - url: /.*
+    static_files: dist/index.html
+    upload: dist/index.html
+    secure: always
+
+env_variables:
+  VITE_API_URL: "https://api.party.one"
