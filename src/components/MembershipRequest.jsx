@@ -197,8 +197,40 @@ const MembershipRequest = () => {
                 method: 'POST',
                 body: formData
             });
+            
+            if (!response.ok) {
+                throw new Error(`Upload failed with status ${response.status}`);
+            }
+            
             const data = await response.json();
-            return data.url && data.url[0];
+            console.log('Upload response:', data);
+            
+            // Extract URL from response
+            if (!data.success || !data.url || !data.url[0]) {
+                throw new Error('Invalid upload response');
+            }
+            
+            let imageUrl = data.url[0];
+            
+            // Clean the URL - remove any trailing quotes or JSON artifacts
+            imageUrl = imageUrl.trim().replace(/["']+$/, '').replace(/^["']+/, '');
+            
+            // Validate it's a proper URL
+            try {
+                const urlObj = new URL(imageUrl);
+                // Ensure it's HTTPS and from the expected domain
+                if (!urlObj.protocol.startsWith('http')) {
+                    throw new Error('Invalid URL protocol');
+                }
+                // Return the cleaned URL
+                imageUrl = urlObj.href;
+            } catch (urlError) {
+                console.error('Invalid URL from upload:', imageUrl, urlError);
+                throw new Error('Invalid URL returned from upload');
+            }
+            
+            console.log('Uploaded image URL:', imageUrl);
+            return imageUrl;
         } catch (err) {
             console.error('Error uploading image:', err);
             throw err;
@@ -246,6 +278,26 @@ const MembershipRequest = () => {
             const backIdUrl = await uploadImage(kycForm.backId);
             const userPhotoUrl = await uploadImage(kycForm.userPhoto);
 
+            // Validate URLs before sending
+            if (!frontIdUrl || !backIdUrl || !userPhotoUrl) {
+                throw new Error('Failed to upload one or more images');
+            }
+
+            // Validate URL format
+            const isValidUrl = (url) => {
+                try {
+                    new URL(url);
+                    return true;
+                } catch {
+                    return false;
+                }
+            };
+
+            if (!isValidUrl(frontIdUrl) || !isValidUrl(backIdUrl) || !isValidUrl(userPhotoUrl)) {
+                console.error('Invalid URLs:', { frontIdUrl, backIdUrl, userPhotoUrl });
+                throw new Error('Invalid image URLs generated. Please try uploading again.');
+            }
+
             // Build payload exactly like admin panel
             const kycPayload = {
                 user_id: currentUser.uid,
@@ -261,9 +313,9 @@ const MembershipRequest = () => {
                 home_city_name: kycForm.cityName,
                 government_id_number: kycForm.governmentNumber,
                 frequency_of_clubbing: kycForm.frequencyOfClubbing,
-                govt_id_front: frontIdUrl || null,
-                govt_id_back: backIdUrl || null,
-                user_image: userPhotoUrl || null,
+                govt_id_front: frontIdUrl,
+                govt_id_back: backIdUrl,
+                user_image: userPhotoUrl,
                 zipcode: kycForm.pincode
             };
 
