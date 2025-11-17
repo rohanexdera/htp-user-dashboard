@@ -1,4 +1,4 @@
-import { auth } from "../../firebase.js";
+import { auth, db } from "../../firebase.js";
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -8,6 +8,7 @@ import {
     sendEmailVerification,
     applyActionCode
 } from "firebase/auth";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -171,95 +172,204 @@ export const loginWithEmailAndPassword = async (email, password) => {
 };
 
 /**
- * Login with Google
- * For Google login, we need to create the user if they don't exist
+ * Login with Google - Simplified OAuth Flow
+ * 1. Authenticate with Google (creates Firebase Auth user)
+ * 2. Check if user profile exists in Firestore
+ * 3. If not, create basic profile (additional details collected via form)
+ * 4. No password needed for OAuth users!
  */
 export const loginWithGoogle = async () => {
     try {
+        console.log('🔐 Starting Google sign-in...');
+        
+        // Step 1: Authenticate with Google
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
         const idToken = await user.getIdToken();
 
-        // Check if user exists in backend, if not create them
-        // Try to get user info first, if fails, create new user
-        try {
-            // Try login first (for existing users)
-            const loginResponse = await fetch(`${API_BASE_URL}/login/v1/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+        console.log('✅ Google sign-in successful:', user.email);
+        console.log('User UID:', user.uid);
+
+        // Step 2: Check if user profile exists in Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (userDocSnap.exists()) {
+            // Existing user - return with profile data
+            console.log('✅ Returning user - profile found');
+            const userData = userDocSnap.data();
+            
+            return {
+                success: true,
+                isNewUser: false,
+                user: {
+                    uid: user.uid,
                     email: user.email,
-                    password: user.uid // Use UID as password for social logins
-                })
-            });
-
-            const loginData = await loginResponse.json();
-            if (loginData.success) {
-                return {
-                    success: true,
-                    user: {
-                        uid: user.uid,
-                        email: user.email,
-                        idToken,
-                        name: user.displayName,
-                        photoURL: user.photoURL
-                    }
-                };
-            }
-        } catch (loginError) {
-            // User doesn't exist, create them
-            console.log('User not found, creating new user...');
+                    name: user.displayName || userData.name,
+                    photoURL: user.photoURL,
+                    idToken,
+                    token: idToken,
+                    profileComplete: true
+                }
+            };
         }
-
-        // Create new user with Google account
-        const createResponse = await fetch(`${API_BASE_URL}/user/v2/create`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                email: user.email,
-                password: user.uid, // Use UID as password for social logins
-                name: user.displayName || 'User',
-                contacts: [{ contact_no: "", mode: "phone", is_active: false, is_verified: false }],
-                role: ['user'],
-                profile_image: user.photoURL || null,
-                gender: null,
-                dob: null,
-                home_city: null,
-                home_city_name: null,
-                home_state: null,
-                home_state_name: null,
-                home_country: null,
-                home_country_name: null,
-                smoking_habbit: false,
-                drinking_habbit: false
-            })
+        
+        // Step 3: New user - create basic Firestore profile
+        console.log('🆕 New user - creating basic profile in Firestore...');
+        
+        await setDoc(userDocRef, {
+            id: user.uid,
+            email: user.email,
+            name: user.displayName || 'User',
+            profile_image: user.photoURL || null,
+            role: ['user'],
+            contacts: [],
+            gender: null, // Will be collected in form
+            dob: null, // Will be collected in form
+            home_city: null,
+            home_city_name: null,
+            home_state: null,
+            home_state_name: null,
+            home_country: null,
+            home_country_name: null,
+            smoking_habbit: false,
+            drinking_habbit: false,
+            active_membership_id: null,
+            active_membership_name: null,
+            last_membership_id: null,
+            last_membership_name: null,
+            status: 'Active',
+            name_lower_case: (user.displayName || 'user').toLowerCase(),
+            phone_no: '', // Will be collected in form
+            club_id: null,
+            token: idToken,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
         });
+        
+        console.log('✅ Basic profile created in Firestore');
+        console.log('ℹ️  Additional details will be collected via form');
+        
+        // Return success with flag indicating profile needs completion
+        return {
+            success: true,
+            isNewUser: true,
+            needsAdditionalInfo: true, // Flag to show form for additional details
+            user: {
+                uid: user.uid,
+                email: user.email,
+                name: user.displayName,
+                photoURL: user.photoURL,
+                idToken,
+                token: idToken,
+                profileComplete: false
+            }
+        };
+        
+    } catch (error) {
+        console.error("❌ Error in Google login:", error);
+        
+        // Handle specific Firebase errors
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return {
+                success: false,
+                error: 'Google sign-in was cancelled'
+            };
+        }
+        
+        if (error.code === 'permission-denied') {
+            return {
+                success: false,
+                error: 'Permission denied. Please check Firebase security rules.'
+            };
+        }
+        
+        return {
+            success: false,
+            error: error.message || 'Google sign-in failed'
+        };
+    }
+};
 
-        const createData = await createResponse.json();
-
-        if (!createData.success) {
-            throw new Error(createData.message || 'Failed to create user account');
+/**
+ * Update Google OAuth user profile with additional details
+ * Called after user completes the additional information form
+ */
+export const updateGoogleUserProfile = async (additionalData) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('No user logged in');
         }
 
+        console.log('📝 Updating user profile with additional details...');
+        
+        const { gender, dob, contactNo, isWhatsapp, home_country, home_country_name, 
+                home_state, home_state_name, home_city, home_city_name } = additionalData;
+
+        // Prepare contacts array
+        const contacts = [];
+        if (contactNo && contactNo.trim()) {
+            if (isWhatsapp) {
+                contacts.push({
+                    contact_no: contactNo,
+                    mode: 'phone',
+                    is_active: true,
+                    is_verified: false
+                });
+                contacts.push({
+                    contact_no: contactNo,
+                    mode: 'whatsapp',
+                    is_active: true,
+                    is_verified: false
+                });
+            } else {
+                contacts.push({
+                    contact_no: contactNo,
+                    mode: 'phone',
+                    is_active: true,
+                    is_verified: false
+                });
+            }
+        }
+
+        // Update Firestore document
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, {
+            gender: gender || 'Male',
+            dob: dob || null,
+            contacts: contacts,
+            phone_no: contactNo || '',
+            home_city: home_city || null,
+            home_city_name: home_city_name || null,
+            home_state: home_state || null,
+            home_state_name: home_state_name || null,
+            home_country: home_country || null,
+            home_country_name: home_country_name || null,
+            updatedAt: serverTimestamp()
+        }, { merge: true }); // merge: true to update only these fields
+
+        console.log('✅ Profile updated successfully');
+        
+        const idToken = await user.getIdToken(true); // Force refresh token
+        
         return {
             success: true,
             user: {
                 uid: user.uid,
                 email: user.email,
-                idToken,
                 name: user.displayName,
-                photoURL: user.photoURL
+                photoURL: user.photoURL,
+                idToken,
+                token: idToken,
+                profileComplete: true
             }
         };
     } catch (error) {
-        console.error("Error in Google login:", error);
+        console.error('❌ Error updating profile:', error);
         return {
             success: false,
-            error: error.code || error.message
+            error: error.message
         };
     }
 };

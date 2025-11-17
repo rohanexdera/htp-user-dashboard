@@ -47,7 +47,15 @@ const Login = () => {
 
       if (result.success) {
         saveUserData(result.user);
-        navigate('/form');
+        
+        // Check if user needs to complete additional information
+        if (result.needsAdditionalInfo || !result.user.profileComplete) {
+          // New user or incomplete profile - redirect to form
+          navigate('/form');
+        } else {
+          // Existing user with complete profile - redirect to dashboard/membership
+          navigate('/membership-request');
+        }
       } else {
         const errorMessage = getErrorMessage(result.error);
         setError(errorMessage);
