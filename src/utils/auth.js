@@ -32,13 +32,41 @@ export const registerWithEmailAndPassword = async (userData) => {
 
         console.log('✅ Firebase Auth user created:', user.uid);
 
-        // Step 2: Send email verification
-        await sendEmailVerification(user, {
-            url: window.location.origin + '/', // Redirect to login after verification
-            handleCodeInApp: false
-        });
+        // Step 2: Send email verification via backend (SendGrid for better deliverability)
+        try {
+            const emailResponse = await fetch(`${API_BASE_URL}/user/v1/sendVerificationEmailLink`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    name: name,
+                    uid: user.uid
+                })
+            });
 
-        console.log('📧 Verification email sent to:', email);
+            const emailData = await emailResponse.json();
+            
+            if (!emailData.success) {
+                console.warn('⚠️ Backend email failed, falling back to Firebase default');
+                // Fallback to Firebase default email
+                await sendEmailVerification(user, {
+                    url: window.location.origin + '/login',
+                    handleCodeInApp: false
+                });
+            } else {
+                console.log('✅ Verification email sent via SendGrid to:', email);
+            }
+        } catch (emailError) {
+            console.error('❌ Email sending error:', emailError);
+            console.log('🔄 Falling back to Firebase default email');
+            // Fallback to Firebase default email
+            await sendEmailVerification(user, {
+                url: window.location.origin + '/login',
+                handleCodeInApp: false
+            });
+        }
 
         // Step 3: Store registration data temporarily in Firestore (pending collection)
         // This will be used to complete profile after email verification
