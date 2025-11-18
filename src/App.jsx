@@ -9,6 +9,7 @@ import MembershipRequest from './components/MembershipRequest.jsx';
 import Profile from './components/Profile.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Header from './components/Header.jsx';
+import ForgetPassword from './components/ForgetPassword.jsx';
 
 const router = createBrowserRouter([
   {
@@ -26,11 +27,19 @@ const router = createBrowserRouter([
       <RegisterV2 />
     </>
   },
+
   {
     path: "/verify-email",
     element: <>
       <Header />
       <EmailVerification />
+    </>
+  },
+  {
+    path : "/forgot",
+    element : <>
+      <Header />
+      <ForgetPassword />
     </>
   },
   {
