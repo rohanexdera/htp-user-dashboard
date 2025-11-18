@@ -16,3 +16,4 @@ handlers:
 
 env_variables:
   VITE_API_URL: "https://api.party.one"
+  
