@@ -108,7 +108,12 @@ const Login = () => {
               required
               className="text-input"
               disabled={loading}
+              name="email"
               autoComplete="email"
+              inputMode="email"
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </div>
 
@@ -122,7 +127,11 @@ const Login = () => {
               required
               className="text-input"
               disabled={loading}
+              name="password"
               autoComplete="current-password"
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </div>
 

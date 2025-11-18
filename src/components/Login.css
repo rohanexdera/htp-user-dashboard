@@ -150,6 +150,9 @@
 .text-input:focus { outline: none; }
 .text-input:disabled { opacity: 0.55; cursor: not-allowed; }
 
+/* Hint browsers to use dark UI defaults for form controls */
+.login-panel, .login-form, .text-input { color-scheme: dark; }
+
 /* Remove Chrome/Safari autofill background while preserving underline */
 .text-input:-webkit-autofill,
 .text-input:-webkit-autofill:hover,
@@ -161,6 +164,33 @@
   background-color: transparent !important;
   transition: background-color 9999s ease-out 0s !important;
 }
+
+/* Ensure autofilled first line inherits typography and color */
+.text-input:-webkit-autofill::first-line {
+  color: var(--text-primary) !important;
+  font-family: inherit !important;
+  font-size: 0.9rem !important;
+}
+
+/* Spec-compliant autofill selector for newer browsers */
+.text-input:autofill {
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  color: var(--text-primary) !important;
+  background: none !important;
+}
+
+/* Firefox autofill adjustments */
+.text-input:-moz-autofill {
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+  -moz-text-fill-color: var(--text-primary) !important;
+  color: var(--text-primary) !important;
+  background: none !important;
+}
+
+/* Neutralize UA invalid styles that can show red underlines/outlines */
+.text-input:invalid { box-shadow: none !important; outline: none !important; }
+input:-moz-ui-invalid { box-shadow: none !important; outline: none !important; }
 
 .primary-btn {
   width: 100%;

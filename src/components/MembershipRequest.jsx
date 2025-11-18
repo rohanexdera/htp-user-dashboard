@@ -475,7 +475,8 @@ const MembershipRequest = () => {
         <div className="mem-page">
             <div className="mem-container">
                 <header className="mem-header">
-                    <p className="mem-subtitle">Welcome, {userData?.name || currentUser?.email}</p>
+                    <h1 className="mem-title">Exclusive Memberships</h1>
+                    <p className="mem-subtitle">{userData?.name || currentUser?.email?.split('@')[0]}</p>
                 </header>
 
                 {error && (
