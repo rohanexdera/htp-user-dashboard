@@ -9,6 +9,14 @@ const Profile = () => {
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Account deletion states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteStep, setDeleteStep] = useState(1); // 1: confirm, 2: OTP, 3: final confirm
+  const [deleteOtp, setDeleteOtp] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState('');
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -73,6 +81,116 @@ const Profile = () => {
 
     fetchUserDetails();
   }, [currentUser]);
+
+  // Account deletion handlers
+  const handleRequestDeleteOtp = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/v1/sendAccountDeleteEmailOtp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: currentUser.uid
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setDeleteSuccess('OTP sent to your email successfully!');
+        setDeleteStep(2);
+      } else {
+        setDeleteError(data.message || 'Failed to send OTP');
+      }
+    } catch (err) {
+      console.error('Error sending delete OTP:', err);
+      setDeleteError('Failed to send OTP. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleVerifyDeleteOtp = async () => {
+    if (!deleteOtp || deleteOtp.length !== 4) {
+      setDeleteError('Please enter a valid 4-digit OTP');
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/v1/VerifyEmailOtp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: userDetails.email,
+          otp: deleteOtp
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setDeleteSuccess('OTP verified successfully!');
+        setDeleteStep(3);
+      } else {
+        setDeleteError('Invalid OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error verifying OTP:', err);
+      setDeleteError('Failed to verify OTP. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
+
+    try {
+      const token = await currentUser.getIdToken();
+      
+      const response = await fetch(`${API_BASE_URL}/user/v1/deleteUser?uid=${currentUser.uid}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': token
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setDeleteSuccess(data.message || 'Account deletion request submitted. You have 7 days to cancel.');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 3000);
+      } else {
+        setDeleteError(data.message || 'Failed to delete account');
+      }
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      setDeleteError('Failed to delete account. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const resetDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteStep(1);
+    setDeleteOtp('');
+    setDeleteError('');
+    setDeleteSuccess('');
+  };
 
   if (loading) {
     return (
@@ -282,8 +400,158 @@ const Profile = () => {
               </div>
             </div>
           )}
+
+          {/* Danger Zone */}
+          <div className="danger-zone">
+            <h2>Danger Zone</h2>
+            <div className="danger-zone-content">
+              <div className="danger-zone-info">
+                <h3>Delete Account</h3>
+                <p>
+                  Once you delete your account, there is no going back after 7 days. 
+                  Please be certain.
+                </p>
+              </div>
+              <button 
+                className="danger-btn" 
+                onClick={() => setShowDeleteModal(true)}
+              >
+                Delete Account
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Account Deletion Modal */}
+      {showDeleteModal && (
+        <div className="modal-overlay" onClick={resetDeleteModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={resetDeleteModal}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+
+            {deleteStep === 1 && (
+              <>
+                <div className="modal-icon danger">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <h2 className="modal-title">Delete Your Account?</h2>
+                <p className="modal-description">
+                  This action will mark your account for deletion. Your account and all data will be 
+                  permanently deleted after 7 days. You can still login and cancel the deletion during this period.
+                </p>
+                <p className="modal-warning">
+                  We will send you an OTP to verify this action.
+                </p>
+                {deleteError && <div className="modal-error">{deleteError}</div>}
+                {deleteSuccess && <div className="modal-success">{deleteSuccess}</div>}
+                <div className="modal-actions">
+                  <button 
+                    className="btn-secondary" 
+                    onClick={resetDeleteModal}
+                    disabled={deleteLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-danger" 
+                    onClick={handleRequestDeleteOtp}
+                    disabled={deleteLoading}
+                  >
+                    {deleteLoading ? 'Sending OTP...' : 'Send OTP'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {deleteStep === 2 && (
+              <>
+                <div className="modal-icon info">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 8L10.89 13.26C11.567 13.72 12.433 13.72 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <h2 className="modal-title">Enter OTP</h2>
+                <p className="modal-description">
+                  We've sent a 4-digit OTP to <strong>{userDetails?.email}</strong>
+                </p>
+                {deleteError && <div className="modal-error">{deleteError}</div>}
+                {deleteSuccess && <div className="modal-success">{deleteSuccess}</div>}
+                <div className="otp-input-group">
+                  <input
+                    type="text"
+                    maxLength="4"
+                    value={deleteOtp}
+                    onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Enter 4-digit OTP"
+                    className="otp-input"
+                    autoFocus
+                  />
+                </div>
+                <div className="modal-actions">
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => setDeleteStep(1)}
+                    disabled={deleteLoading}
+                  >
+                    Back
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    onClick={handleVerifyDeleteOtp}
+                    disabled={deleteLoading || deleteOtp.length !== 4}
+                  >
+                    {deleteLoading ? 'Verifying...' : 'Verify OTP'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {deleteStep === 3 && (
+              <>
+                <div className="modal-icon danger">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <h2 className="modal-title">Final Confirmation</h2>
+                <p className="modal-description">
+                  Are you absolutely sure? This will mark your account for permanent deletion after 7 days.
+                </p>
+                <div className="confirmation-list">
+                  <p>✓ OTP verified successfully</p>
+                  <p>✓ All your data will be deleted in 7 days</p>
+                  <p>✓ You can still login and cancel within 7 days</p>
+                  <p>✓ You will receive confirmation emails and notifications</p>
+                </div>
+                {deleteError && <div className="modal-error">{deleteError}</div>}
+                {deleteSuccess && <div className="modal-success">{deleteSuccess}</div>}
+                <div className="modal-actions">
+                  <button 
+                    className="btn-secondary" 
+                    onClick={resetDeleteModal}
+                    disabled={deleteLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-danger" 
+                    onClick={handleDeleteAccount}
+                    disabled={deleteLoading}
+                  >
+                    {deleteLoading ? 'Processing...' : 'Yes, Delete My Account'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
