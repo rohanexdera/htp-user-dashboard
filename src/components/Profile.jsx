@@ -13,10 +13,11 @@ const Profile = () => {
   // Account deletion states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteStep, setDeleteStep] = useState(1); // 1: confirm, 2: OTP, 3: final confirm
-  const [deleteOtp, setDeleteOtp] = useState('');
+  const [deleteOtp, setDeleteOtp] = useState(['', '', '', '']);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [deleteSuccess, setDeleteSuccess] = useState('');
+  const otpInputsRef = React.useRef([]);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -115,7 +116,8 @@ const Profile = () => {
   };
 
   const handleVerifyDeleteOtp = async () => {
-    if (!deleteOtp || deleteOtp.length !== 4) {
+    const otpValue = deleteOtp.join('');
+    if (!otpValue || otpValue.length !== 4) {
       setDeleteError('Please enter a valid 4-digit OTP');
       return;
     }
@@ -131,7 +133,7 @@ const Profile = () => {
         },
         body: JSON.stringify({
           email: userDetails.email,
-          otp: deleteOtp
+          otp: otpValue
         })
       });
 
@@ -151,6 +153,39 @@ const Profile = () => {
     }
   };
 
+  const handleOtpChange = (index, value) => {
+    // Only allow digits
+    if (value && !/^\d$/.test(value)) return;
+
+    const newOtp = [...deleteOtp];
+    newOtp[index] = value;
+    setDeleteOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 3) {
+      otpInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    // Handle backspace
+    if (e.key === 'Backspace' && !deleteOtp[index] && index > 0) {
+      otpInputsRef.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').trim();
+    
+    // Only accept 4-digit numbers
+    if (/^\d{4}$/.test(pastedData)) {
+      const newOtp = pastedData.split('');
+      setDeleteOtp(newOtp);
+      otpInputsRef.current[3]?.focus();
+    }
+  };
+
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
     setDeleteError('');
@@ -162,7 +197,8 @@ const Profile = () => {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'token': token
+          'token': token,
+          'uid': currentUser.uid
         }
       });
 
@@ -187,7 +223,7 @@ const Profile = () => {
   const resetDeleteModal = () => {
     setShowDeleteModal(false);
     setDeleteStep(1);
-    setDeleteOtp('');
+    setDeleteOtp(['', '', '', '']);
     setDeleteError('');
     setDeleteSuccess('');
   };
@@ -483,15 +519,31 @@ const Profile = () => {
                 {deleteError && <div className="modal-error">{deleteError}</div>}
                 {deleteSuccess && <div className="modal-success">{deleteSuccess}</div>}
                 <div className="otp-input-group">
-                  <input
-                    type="text"
-                    maxLength="4"
-                    value={deleteOtp}
-                    onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 4-digit OTP"
-                    className="otp-input"
-                    autoFocus
-                  />
+                  <div className="otp-boxes">
+                    {deleteOtp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => (otpInputsRef.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength="1"
+                        value={digit}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        onPaste={handleOtpPaste}
+                        className="otp-box"
+                        autoFocus={index === 0}
+                      />
+                    ))}
+                  </div>
+                  <p style={{ 
+                    textAlign: 'center', 
+                    fontSize: '13px', 
+                    color: '#94a3b8',
+                    margin: '12px 0 0 0'
+                  }}>
+                    Enter the 4-digit code sent to your email
+                  </p>
                 </div>
                 <div className="modal-actions">
                   <button 
@@ -504,7 +556,7 @@ const Profile = () => {
                   <button 
                     className="btn-primary" 
                     onClick={handleVerifyDeleteOtp}
-                    disabled={deleteLoading || deleteOtp.length !== 4}
+                    disabled={deleteLoading || deleteOtp.join('').length !== 4}
                   >
                     {deleteLoading ? 'Verifying...' : 'Verify OTP'}
                   </button>
