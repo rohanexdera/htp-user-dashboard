@@ -20,7 +20,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-const API_BASE_URL = 'https://party-one-developer.uc.r.appspot.com';
+const API_BASE_URL = 'https://api.party.one';
 const TEST_EMAIL = 'groook757@gmail.com';
 const TEST_PASSWORD = 'Rohan@757';
 

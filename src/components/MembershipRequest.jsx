@@ -10,7 +10,7 @@ import amethystImg from '../assets/ame.webp';
 import solitaireImg from '../assets/Solitaire.webp';
 import silverImg from '../assets/silver.webp';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://party-one-developer.uc.r.appspot.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.party.one';
 const UPLOAD_URL = import.meta.env.VITE_MULTIPLEIMAGES_POSTING_URL || API_BASE_URL;
 
 const MembershipRequest = () => {

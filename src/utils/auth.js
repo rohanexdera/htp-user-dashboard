@@ -13,7 +13,7 @@ import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 const googleProvider = new GoogleAuthProvider();
 
 // Backend API URL - Update this with your actual backend URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://party-one-developer.uc.r.appspot.com/';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.party.one';
 
 /**
  * Register user with email and password

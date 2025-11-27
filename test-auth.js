@@ -6,7 +6,7 @@
  * Password: Rohan@757
  */
 
-const API_BASE_URL = 'https://party-one-developer.uc.r.appspot.com';
+const API_BASE_URL = 'https://api.party.one';
 
 async function testLogin() {
     console.log('🔍 Testing Authentication...\n');

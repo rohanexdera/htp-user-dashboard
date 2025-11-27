@@ -4,7 +4,7 @@ import { registerWithEmailAndPassword, loginWithGoogle } from '../utils/auth';
 import { useAuth } from '../context/AuthContext';
 import './Register.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://party-one-developer.uc.r.appspot.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.party.one';
 
 const Register = () => {
   const [formData, setFormData] = useState({
